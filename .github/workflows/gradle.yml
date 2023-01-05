@@ -3,8 +3,6 @@ name: Java CI with Gradle
 on:
   push:
     branches: [ main ]
-  pull_request:
-    branches: [ main ]
 
 
 jobs:
@@ -31,11 +29,6 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
-      - name: Run BuildTools
-        uses: SpraxDev/Action-SpigotMC@v4
-        with:
-          versions: '1.19.2'
-          remapped: true
       - name: Build with Gradle
         uses: gradle/gradle-build-action@v2
         with:

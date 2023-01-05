@@ -1,2 +1,2 @@
-# SpigotTemplate
-A gradle template for creating a Spigot plugin.
+# Chairs
+#### A simple plugin that allows you to sit on stairs
