@@ -1,0 +1,120 @@
+plugins {
+    id 'java'
+    id 'maven-publish'
+    id 'kr.entree.spigradle' version '2.4.2'
+    id("io.typecraft.gradlesource.spigot") version "1.0.0"
+    id "com.github.johnrengelman.shadow" version "7.1.2"
+}
+
+apply from: rootProject.file('specialSource.gradle')
+apply from: rootProject.file('buildtools.gradle')
+
+group 'fr.minemobs'
+version '1.0-SNAPSHOT'
+String mcVersion = '1.19.2'
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+repositories {
+    mavenCentral()
+    mavenLocal()
+    maven {
+        url 'https://maven.thesimpleteam.net/snapshots'
+    }
+    maven {
+        name = "Jeff"
+        url = 'https://hub.jeff-media.com/nexus/repository/jeff-media-public/'
+    }
+}
+
+dependencies {
+    compileOnly "org.spigotmc:spigot:$mcVersion-R0.1-SNAPSHOT:remapped-mojang"
+    compileOnly(spigot(mcVersion))
+    implementation 'fr.sunderia:SunderiaUtils:1.5.5-SNAPSHOT'
+}
+
+setMCVersion {
+    version = mcVersion
+}
+
+shadowJar {
+    configurations = [project.configurations.runtimeClasspath, project.configurations.shadow]
+}
+
+spigotRemap {
+    spigotVersion.set(mcVersion)
+    sourceJarTask.set(tasks.shadowJar)
+}
+
+tasks.prepareSpigotPlugins.dependsOn shadowJar
+tasks.runSpigot.dependsOn prepareSpigotPlugins
+
+spigot {
+    debug {
+        args '--nojline', '--max-players', '100'
+        jvmArgs '-Xmx2G'
+        serverPort 25565
+        eula = true
+    }
+    authors group.toString().split('\\.')[1]
+    apiVersion mcVersion.split("\\.")[0..1].join('.')
+}
+
+afterEvaluate {
+    shadowJar {
+        doLast {
+            def outputFiles = outputs.files.files
+            for (inputFile in outputFiles) {
+                File intermediateFile = new File(temporaryDir, inputFile.name.replace('.jar', '-obf.jar'))
+                File outputFile = inputFile
+                remapMojangToSpigot(inputFile, intermediateFile, outputFile, "1.18.1-R0.1-SNAPSHOT")
+            }
+        }
+    }
+}
+
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            artifactId = project.name
+            from components.java
+            pom {
+                name = project.name
+                description = project.description
+                url = "https://github.com/${group.toString().split('\\.')[1]}/${wordUppercase(project.name)}"
+                licenses {
+                    license {
+                        name = 'MIT'
+                        url = 'https://opensource.org/licenses/MIT'
+                    }
+                }
+                developers {
+                    developer {
+                        id = 'minemobs'
+                        name = 'minemobs'
+                    }
+                }
+            }
+        }
+    }
+    repositories {
+        maven {
+            name 'sunderiaRepo'
+            def extension = version.toString().endsWith('-SNAPSHOT') ? 'snapshots' : 'releases'
+            url 'https://maven.galaxyfight.fr/' + extension
+            credentials(PasswordCredentials)
+            authentication {
+                basic(BasicAuthentication)
+            }
+        }
+    }
+}
+
+private static wordUppercase(String s) {
+    StringBuilder sb = new StringBuilder(s.length())
+    for (final def str in s.split("\\s+")) {
+        sb.append(str.substring(0, 1).toUpperCase()).append(str.substring(1))
+    }
+    return sb.toString()
+}
