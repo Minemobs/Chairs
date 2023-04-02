@@ -43,12 +43,13 @@ public class ChairListener implements Listener {
         if (!chairs.containsKey(event.getClickedBlock())) {
             Location centeredLoc = getCenteredLoc(event.getClickedBlock());
             centeredLoc.setDirection(stairs.getFacing().getDirection().multiply(-1));
-            ArmorStand asT = event.getPlayer().getWorld().spawn(centeredLoc, ArmorStand.class);
-            asT.setMarker(true);
-            asT.setSilent(true);
-            asT.setGravity(false);
-            asT.setPersistent(true);
-            asT.setVisible(false);
+            ArmorStand asT = event.getPlayer().getWorld().spawn(centeredLoc, ArmorStand.class, chair -> {
+                chair.setMarker(true);
+                chair.setSilent(true);
+                chair.setGravity(false);
+                chair.setPersistent(true);
+                chair.setVisible(false);
+            });
             chairs.put(event.getClickedBlock(), asT);
             ast = asT;
         }
