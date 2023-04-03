@@ -7,6 +7,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
+import org.bukkit.block.data.Bisected.Half;
 import org.bukkit.block.data.type.Stairs;
 import org.bukkit.entity.*;
 import org.bukkit.event.EventHandler;
@@ -24,10 +25,13 @@ import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ChairListener implements Listener {
 
-    private static final Map<Block, LivingEntity> chairs = new HashMap<>();
+    private record Chair(LivingEntity stair, Location oldPlayerLoc, AtomicBoolean hasMoved) {}
+
+    private static final Map<Block, Chair> chairs = new HashMap<>();
     private final JavaPlugin plugin;
 
     ChairListener(JavaPlugin plugin) {
@@ -36,9 +40,11 @@ public class ChairListener implements Listener {
 
     @EventHandler
     public void onChairInteract(PlayerInteractEvent event) {
-        if (event.getAction() != Action.RIGHT_CLICK_BLOCK || event.getPlayer().isSneaking()
-                || !(event.getClickedBlock().getBlockData() instanceof Stairs stairs))
+        if (event.getAction() != Action.RIGHT_CLICK_BLOCK || event.getPlayer().isSneaking() || event.getPlayer().isInsideVehicle()
+                || !(event.getClickedBlock().getBlockData() instanceof Stairs stairs) || event.getClickedBlock().getLocation().add(0, 1, 0).getBlock().isEmpty() ||
+                stairs.getHalf() == Half.TOP)
             return;
+        plugin.getLogger().info("Facing: " + stairs.getFacing().name());
         LivingEntity ast = null;
         if (!chairs.containsKey(event.getClickedBlock())) {
             Location centeredLoc = getCenteredLoc(event.getClickedBlock());
@@ -50,23 +56,27 @@ public class ChairListener implements Listener {
                 chair.setPersistent(true);
                 chair.setVisible(false);
             });
-            chairs.put(event.getClickedBlock(), asT);
             ast = asT;
-        }
-        if (ast == null)
-            ast = chairs.get(event.getClickedBlock());
-        if (!ast.getPassengers().isEmpty())
-            return;
+            chairs.put(event.getClickedBlock(), new Chair(ast, event.getPlayer().getLocation(), new AtomicBoolean()));
+        } else ast = chairs.get(event.getClickedBlock()).stair();
+        if (!ast.getPassengers().isEmpty()) return;
         ast.addPassenger(event.getPlayer());
     }
 
     @EventHandler
     public void onPlayerDismount(EntityDismountEvent event) {
-        if (!(event.getEntity() instanceof Player player) || !(event.getDismounted() instanceof ArmorStand ast))
-            return;
+        if (!(event.getEntity() instanceof Player player) || !(event.getDismounted() instanceof ArmorStand ast)) return;
         Location location = ast.getLocation();
+        var entryOptional = chairs.values().stream().filter(entry -> entry.stair().getUniqueId().equals(ast.getUniqueId())).findFirst();
+        if(entryOptional.isEmpty()) return;
         chairs.remove(location.subtract(.5d, .25d, .5d).getBlock());
-        player.teleport(location.add(0d, 1d, 0d).setDirection(player.getEyeLocation().getDirection()));
+        var oldPlayerLocation = entryOptional.get().oldPlayerLoc();
+        if(oldPlayerLocation.getBlock().isEmpty() && !oldPlayerLocation.add(0, -1, 0).getBlock().isPassable() &&
+            oldPlayerLocation.add(0, 1, 0).getBlock().isEmpty() && !entryOptional.get().hasMoved().get()) {
+                player.teleport(oldPlayerLocation);
+        } else {
+            player.teleport(player.getLocation().add(0, 1, 0).setDirection(player.getEyeLocation().getDirection()));
+        }
         ast.remove();
     }
 
@@ -74,7 +84,7 @@ public class ChairListener implements Listener {
     public void onBlockBreak(BlockBreakEvent event) {
         if (!chairs.containsKey(event.getBlock()))
             return;
-        LivingEntity entity = chairs.get(event.getBlock());
+        LivingEntity entity = chairs.get(event.getBlock()).stair();
         entity.eject();
         entity.remove();
     }
@@ -82,9 +92,10 @@ public class ChairListener implements Listener {
     @EventHandler
     public void onBlockExplode(EntityExplodeEvent event) {
         chairs.keySet().stream()
-                .filter(chair -> event.blockList().contains(chair))
-                .toList().forEach(block -> {
-                    LivingEntity entity = chairs.get(block);
+                .filter(event.blockList()::contains)
+                .map(chairs::get)
+                .map(Chair::stair)
+                .forEach(entity -> {
                     entity.eject();
                     entity.remove();
                 });
@@ -111,14 +122,14 @@ public class ChairListener implements Listener {
 
     private void onPiston(List<Block> blocks, BlockFace direction) {
         blocks.stream().filter(chairs::containsKey).map(Block::getState).forEach(block -> {
-            LivingEntity ast = chairs.get(block.getBlock());
+            LivingEntity ast = chairs.get(block.getBlock()).stair();
             Bukkit.getScheduler().runTask(plugin, () -> {
                 Location add = getCenteredLoc(block.getBlock().getLocation().add(direction.getDirection()));
                 Block blk = add.getBlock();
                 if (blk.getBlockData() instanceof Stairs rot)
                     add.setDirection(rot.getFacing().getDirection());
                 setEntityPos(ast, add);
-                chairs.put(blk, ast);
+                chairs.put(blk, new Chair(ast, chairs.get(block.getBlock()).oldPlayerLoc(), new AtomicBoolean(true)));
             });
         });
     }
@@ -140,7 +151,8 @@ public class ChairListener implements Listener {
     }
 
     public static void killAllChairs() {
-        ImmutableMap.copyOf(chairs).forEach((block, entity) -> {
+        ImmutableMap.copyOf(chairs).forEach((block, entry) -> {
+            var entity = entry.stair();
             entity.eject();
             entity.remove();
             chairs.remove(block);
