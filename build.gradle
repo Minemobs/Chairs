@@ -5,7 +5,7 @@ plugins {
 }
 
 group 'fr.minemobs'
-version '1.1'
+version '1.2'
 String mcVersion = '1.19.3'
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
