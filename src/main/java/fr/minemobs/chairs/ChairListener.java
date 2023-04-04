@@ -41,7 +41,8 @@ public class ChairListener implements Listener {
     @EventHandler
     public void onChairInteract(PlayerInteractEvent event) {
         if (event.getAction() != Action.RIGHT_CLICK_BLOCK || event.getPlayer().isSneaking() || event.getPlayer().isInsideVehicle()
-                || !(event.getClickedBlock().getBlockData() instanceof Stairs stairs) || event.getClickedBlock().getLocation().add(0, 1, 0).getBlock().isEmpty() || stairs.getHalf() == Half.TOP)
+                || !(event.getClickedBlock().getBlockData() instanceof Stairs stairs) || !event.getClickedBlock().getLocation().add(0, 1, 0).getBlock().isEmpty()
+                || stairs.getHalf() == Half.TOP)
             return;
         LivingEntity ast = null;
         if (!chairs.containsKey(event.getClickedBlock())) {
