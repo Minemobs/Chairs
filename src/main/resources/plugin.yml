@@ -1,0 +1,6 @@
+main: fr.minemobs.chairs.MainPlugin
+name: chairs
+version: 1.2.2
+authors:
+  - minemobs
+api-version: 1.20.6

@@ -1,14 +1,14 @@
 plugins {
     id 'java'
-    id 'kr.entree.spigradle' version '2.4.2'
+    id 'kr.entree.spigradle' version '2.4.3'
     id 'eclipse'
 }
 
 group 'fr.minemobs'
-version '1.2'
-String mcVersion = '1.19.3'
+version '1.2.2'
+String mcVersion = '1.20.6'
 
-java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
 repositories {
     mavenCentral()
@@ -21,6 +21,8 @@ dependencies {
 
 tasks.prepareSpigotPlugins.dependsOn build
 tasks.runSpigot.dependsOn prepareSpigotPlugins
+tasks.detectSpigotMain.enabled = false
+tasks.generateSpigotDescription.enabled = false
 
 spigot {
     debug {
@@ -29,6 +31,4 @@ spigot {
         serverPort 25565
         eula = true
     }
-    authors group.toString().split('\\.')[1]
-    apiVersion mcVersion.split("\\.")[0..1].join('.')
 }
